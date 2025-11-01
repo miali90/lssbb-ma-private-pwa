@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang='en'><head><meta charset='utf-8'/><meta name='viewport' content='width=device-width,initial-scale=1'/>
+<title>Lean Six Sigma Black Belt — Michele Alizzi Private Edition</title>
+<link rel='manifest' href='manifest.webmanifest' type='application/manifest+json'>
+<meta name='theme-color' content='#22c55e'/>
+<style>
+body{font-family:system-ui,Segoe UI,Roboto,Arial;background:#0b1220;color:#eaf3ff;margin:0}
+.container{max-width:1100px;margin:0 auto;padding:16px}
+.card{background:#121a2b;border:1px solid #22314f;border-radius:14px;box-shadow:0 10px 24px rgba(0,0,0,.2)}
+header{display:flex;gap:12px;align-items:center;padding:16px;border-bottom:1px solid #22314f}
+.logo{width:36px;height:36px;border-radius:10px;background:#22c55e;color:#06230f;display:grid;place-items:center;font-weight:800}
+.btn{cursor:pointer;background:#22c55e;color:#071b12;border:none;padding:10px 12px;border-radius:10px;font-weight:700}
+.btn.secondary{background:transparent;color:#eaf3ff;border:1px solid #22314f}
+.section{padding:12px;border-radius:12px;background:rgba(255,255,255,.03);border:1px solid #22314f;margin:12px 0}
+.options{display:grid;gap:8px;margin-top:10px}
+.opt{background:#0f1a30;border:1px solid #22314f;border-radius:10px;padding:10px}
+.progress{height:10px;border:1px solid #22314f;border-radius:999px;overflow:hidden}
+.progress>div{height:100%;background:linear-gradient(90deg,#22c55e,#10b981);width:0%}
+.pill{border:1px dashed #22314f;border-radius:999px;padding:6px 10px;color:#9db1d9}
+</style></head>
+<body>
+<div class='container'><div class='card'>
+<header><div class='logo'>Σ</div><h2 style='margin:0'>Lean Six Sigma Black Belt — Michele Alizzi Private Edition</h2>
+<div style='margin-left:auto'><button class='btn secondary' id='installBtn'>Install</button></div></header>
+
+<div class='section'>
+  <div>Block size <select id='size'><option>25</option><option>50</option><option>100</option><option selected>180</option></select></div>
+  <div>Difficulty <select id='diff'><option value='all' selected>All</option><option value='basic'>Basic</option><option value='intermediate'>Intermediate</option><option value='advanced'>Advanced</option></select></div>
+  <div><label><input type='checkbox' id='rand' checked/> Randomize</label> <span class='pill' id='preset'>3h 30m for 180 Q</span></div>
+  <div id='cats'></div>
+  <div style='margin-top:8px'><button class='btn' id='start'>Start</button> <button class='btn secondary' id='resume'>Resume</button> <button class='btn secondary' id='reset'>Reset</button></div>
+</div>
+
+<div class='section'><div class='progress'><div id='bar'></div></div><div id='score'>Score: 0/0</div><div id='counter'>Question 0 of 0</div>
+<div class='pill'>Timer: <span id='t'>00:00:00</span> • Remaining: <span id='r'>—</span></div></div>
+
+<div id='exam' class='section' style='display:none'>
+  <div id='qText' style='font-weight:700'></div>
+  <div id='qOptions' class='options'></div>
+  <div id='hint' style='display:none;color:#ffdca3'></div>
+  <div id='exp' style='display:none;color:#9fe6b2'></div>
+  <div><button class='btn secondary' id='back'>Back</button> <button class='btn secondary' id='showHint'>Hint</button> <button class='btn' id='submit'>Submit</button></div>
+</div>
+
+<div id='results' class='section' style='display:none'>
+  <h3>Results & Review</h3>
+  <div id='final'></div>
+  <div><button class='btn' id='csv'>Export CSV</button> <button class='btn secondary' id='reviewToggle'>Toggle Review</button></div>
+  <div id='review' style='display:none;max-height:420px;overflow:auto'><table id='rev' style='width:100%;border-collapse:collapse'><thead><tr><th>#</th><th>Question</th><th>Your</th><th>Correct</th><th>Res</th><th>Cat</th><th>Diff</th></tr></thead><tbody></tbody></table></div>
+</div>
+
+</div></div>
+
+<script>
+const STORAGE='lssbb_ma_pages_state_v2';
+const CATS=['Fundamentals_DMAIC','Lean_Waste_VSM','Statistics_Measurement','Project_Roles_Management','Tools_Techniques','History_Integration_Misc'];
+let ALL=[],BLOCK=[],STATE={idx:0,score:0,answered:0,misses:{},answers:{},limit:0,start:0,finished:false};
+const $=id=>document.getElementById(id);
+const hms=s=>{s=Math.max(0,s|0);const h=(s/3600)|0,m=((s%3600)/60)|0,x=(s%60)|0;return [h,m,x].map(v=>String(v).padStart(2,'0')).join(':')};
+const pct=(a,b)=>Math.round(100*a/Math.max(1,b));
+
+(function buildCats(){const wrap=$('cats'); CATS.forEach(c=>{const id='c_'+c; const lab=document.createElement('label'); lab.innerHTML=`<input type='checkbox' id='${id}' checked/> ${c.replaceAll('_',' / ')}`; wrap.appendChild(lab);});})();
+
+function perQ(){return Math.round(12600/180)}
+function autoLimit(n){return perQ()*n}
+function updatePreset(){const n=parseInt($('size').value,10); const s=autoLimit(n); $('preset').textContent=`${(s/3600)|0}h ${((s%3600)/60)|0}m for ${n} Q`;}
+updatePreset(); $('size').addEventListener('change', updatePreset);
+
+async function loadAll(){ const res=await fetch('questions_800.json'); ALL=await res.json(); }
+function pool(){ let p=ALL.slice(); const cats=CATS.filter(c=>document.getElementById('c_'+c).checked); p=p.filter(q=>cats.includes(q.category)); const d=document.getElementById('diff').value; if(d!=='all') p=p.filter(q=>q.difficulty===d); if(document.getElementById('rand').checked) p.sort(()=>Math.random()-0.5); return p; }
+function save(){ localStorage.setItem(STORAGE, JSON.stringify({STATE,BLOCK})); }
+function resume(){ const raw=localStorage.getItem(STORAGE); if(!raw) return false; const o=JSON.parse(raw); STATE=o.STATE; BLOCK=o.BLOCK; return true; }
+
+let ticker=null;
+function startTimer(){ if(ticker) clearInterval(ticker); STATE.start=Date.now(); ticker=setInterval(()=>{ const el=((Date.now()-STATE.start)/1000)|0; document.getElementById('t').textContent=hms(el); document.getElementById('r').textContent=hms(STATE.limit-el); if(el>=STATE.limit){ clearInterval(ticker); finish(); } },1000); }
+
+function setProgress(){ document.getElementById('bar').style.width=Math.round(100*STATE.idx/Math.max(1,BLOCK.length))+'%'; document.getElementById('score').textContent=`Score: ${STATE.score}/${STATE.answered}`; document.getElementById('counter').textContent=`Question ${Math.min(STATE.idx+1,BLOCK.length)} of ${BLOCK.length}`; }
+
+function start(){ STATE={idx:0,score:0,answered:0,misses:{},answers:{},limit:autoLimit(parseInt(document.getElementById('size').value,10)),start:0,finished:false}; BLOCK=pool().slice(0, parseInt(document.getElementById('size').value,10)); document.getElementById('exam').style.display='block'; document.getElementById('results').style.display='none'; render(); setProgress(); startTimer(); save(); }
+function render(){ if(STATE.idx>=BLOCK.length){ finish(); return; } const q=BLOCK[STATE.idx]; document.getElementById('qText').textContent=q.question; document.getElementById('qOptions').innerHTML=q.options.map((o,i)=>`<label class='opt'><input type='radio' name='o' value='${i}'/> ${o}</label>`).join(''); document.getElementById('hint').textContent='Hint: '+q.hint; document.getElementById('exp').textContent='Explanation: '+q.explanation; document.getElementById('hint').style.display='none'; document.getElementById('exp').style.display='none'; }
+function chosen(){ const els=document.querySelectorAll('input[name=o]'); for(const e of els){ if(e.checked) return +e.value; } return null; }
+function submit(){ if(STATE.idx>=BLOCK.length) return finish(); const q=BLOCK[STATE.idx]; const sel=chosen(); if(sel===null){ alert('Choose an option.'); return; } const id=q.id; if(!STATE.misses[id]) STATE.misses[id]=0; if(sel===q.answer_index){ if(STATE.misses[id]===0) STATE.score++; STATE.answered++; STATE.answers[id]={chosen:sel,correct:true}; STATE.idx++; render(); } else { STATE.misses[id]++; STATE.answers[id]={chosen:sel,correct:false}; if(STATE.misses[id]===1){ document.getElementById('hint').style.display='block'; } else { document.getElementById('exp').style.display='block'; STATE.answered++; STATE.idx++; render(); } } setProgress(); save(); }
+function back(){ if(STATE.idx>0){ STATE.idx--; render(); setProgress(); save(); } }
+function finish(){ document.getElementById('exam').style.display='none'; document.getElementById('results').style.display='block'; const elapsed=STATE.start?(((Date.now()-STATE.start)/1000)|0):0; document.getElementById('final').textContent=`Score: ${STATE.score}/${STATE.answered} (${Math.round(100*STATE.score/Math.max(1,STATE.answered))}%) • Time: ${hms(elapsed)} / ${hms(STATE.limit)} • Block: ${BLOCK.length}`; buildReview(); save(); }
+function buildReview(){ const tb=document.querySelector('#rev tbody'); tb.innerHTML=''; BLOCK.forEach((q,i)=>{ const a=STATE.answers[q.id]||{}; const your=(a.chosen!=null)?q.options[a.chosen]:'—'; const cor=q.options[q.answer_index]; const res=a.correct?'✔':(a.chosen!=null?'✖':'—'); const tr=document.createElement('tr'); tr.innerHTML=`<td>${i+1}</td><td>${q.question}</td><td>${your}</td><td>${cor}</td><td>${res}</td><td>${q.category}</td><td>${q.difficulty}</td>`; tb.appendChild(tr); }); }
+function csv(){ const rows=[['#','Question','Your Answer','Correct','Result','Category','Difficulty']]; BLOCK.forEach((q,i)=>{ const a=STATE.answers[q.id]||{}; const your=(a.chosen!=null)?q.options[a.chosen]:''; const cor=q.options[q.answer_index]; const res=a.correct?'Correct':(a.chosen!=null?'Incorrect':'Unanswered'); rows.push([i+1,q.question.replaceAll('\n',' '),your,cor,res,q.category,q.difficulty]); }); const csv=rows.map(r=>r.map(v=>`"${String(v).replaceAll('"','""')}"`).join(',')).join('\n'); const url=URL.createObjectURL(new Blob([csv],{type:'text/csv'})); const a=document.createElement('a'); a.href=url; a.download='lssbb_results.csv'; a.click(); URL.revokeObjectURL(url); }
+
+document.getElementById('start').addEventListener('click', async()=>{ const res=await fetch('questions_800.json'); ALL=await res.json(); start(); });
+document.getElementById('resume').addEventListener('click', ()=>{ const raw=localStorage.getItem(STORAGE); if(!raw) return; const o=JSON.parse(raw); STATE=o.STATE; BLOCK=o.BLOCK; document.getElementById('exam').style.display='block'; document.getElementById('results').style.display=STATE.idx>=BLOCK.length?'block':'none'; render(); setProgress(); });
+document.getElementById('reset').addEventListener('click', ()=>{ localStorage.removeItem(STORAGE); alert('Local session cleared.'); });
+document.getElementById('submit').addEventListener('click', submit);
+document.getElementById('back').addEventListener('click', back);
+document.getElementById('showHint').addEventListener('click', ()=>{ document.getElementById('hint').style.display='block'; });
+document.getElementById('reviewToggle').addEventListener('click', ()=>{ const el=document.getElementById('review'); el.style.display=(el.style.display==='none'?'block':'none'); });
+let dp=null; window.addEventListener('beforeinstallprompt',e=>{e.preventDefault(); dp=e; document.getElementById('installBtn').disabled=false;}); document.getElementById('installBtn').addEventListener('click', async()=>{ if(!dp){ alert('Install prompt not available yet. Try reloading once.'); return;} dp.prompt(); await dp.userChoice; dp=null; });
+if('serviceWorker' in navigator){ window.addEventListener('load', ()=>navigator.serviceWorker.register('sw.js')); }
+</script>
+</body></html>

@@ -1,0 +1,23 @@
+{
+  "name": "Lean Six Sigma Black Belt \u2014 Michele Alizzi Private Edition",
+  "short_name": "LSSBB \u2014 MA",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "background_color": "#0b1220",
+  "theme_color": "#22c55e",
+  "icons": [
+    {
+      "src": "assets/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "assets/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
